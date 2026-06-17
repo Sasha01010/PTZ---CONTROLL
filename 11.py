@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""
-PTZ Array Controller | MediaPipe + MySQL + VISCA over IP
-✅ АБСОЛЮТНО ФИНАЛЬНАЯ ВЕРСИЯ:
-1. ГИБРИДНЫЙ ТРЕКЕР: Использует расстояние между центрами, а не только площадь (IoU). 
-   Теперь камера НЕ ТЕРЯЕТ ID, когда вы отходите и лицо уменьшается.
-2. СНИЖЕННЫЙ ПОРОГ: min_detection_confidence=0.25 для ловли мелких лиц вдалеке.
-3. ПАМЯТЬ 3 СЕКУНДЫ: max_lost_frames=90. Лицо не сбрасывается при моргании или повороте.
-4. ПЛАВНОЕ ДВИЖЕНИЕ: Alpha=0.12, Deadzone=10%, Max Speed=14. Без рывков и плясок.
-"""
+
 import cv2
 import numpy as np
 import mediapipe as mp
@@ -87,7 +79,7 @@ class ViscaController:
                 self.last_cmd_time = now
                 return True
             except Exception as e:
-                print(f"❌ VISCA Send Error: {e}")
+                print(f"VISCA Send Error: {e}")
                 return False
 
     def move(self, direction, pan_speed=0x10, tilt_speed=0x10, force=False):
@@ -106,7 +98,7 @@ class ViscaController:
                     self.last_cmd_tuple = cmd_tuple
 
     def home(self):
-        print(f"🏠 Отправка HOME команды на {self.ip}:{self.port}")
+        print(f" Отправка HOME команды на {self.ip}:{self.port}")
         self.last_cmd_tuple = None
         self._send(bytes([0x01, 0x06, 0x04]), force=True)
 
@@ -138,7 +130,7 @@ class DatabaseManager:
             except queue.Empty:
                 continue
             except Exception as e:
-                print(f"⚠️ DB Worker Error: {e}")
+                print(f"DB Worker Error: {e}")
 
     def _insert_log(self, data):
         if not self.connected: return
@@ -152,7 +144,7 @@ class DatabaseManager:
             conn.commit()
             conn.close()
         except Error as e:
-            print(f"❌ Ошибка записи в БД: {e}")
+            print(f"Ошибка записи в БД: {e}")
             self.connected = False
 
     def init_database(self):
@@ -171,9 +163,9 @@ class DatabaseManager:
             self.session_id = cur.lastrowid
             conn.commit()
             self.connected = True
-            print(f"✅ БД подключена. Session ID: {self.session_id}")
+            print(f"БД подключена. Session ID: {self.session_id}")
         except Error as e:
-            print(f"⚠️ Не удалось подключить БД: {e}")
+            print(f"Не удалось подключить БД: {e}")
 
     def log(self, obj_id, cam_id, conf, x, y):
         if self.connected and self.session_id:
@@ -197,7 +189,7 @@ class DatabaseManager:
             conn.close()
             return result
         except Error as e:
-            print(f"❌ Ошибка чтения из БД: {e}")
+            print(f"Ошибка чтения из БД: {e}")
             return []
 
 # ═══════════════════════════════════════════════════════════════
@@ -231,8 +223,7 @@ class SmartFaceTracker:
         dist_x = abs(curr_cx - prev_cx) / max(prev_box[2], 1)
         dist_y = abs(curr_cy - prev_cy) / max(prev_box[3], 1)
         
-        # ✅ ГЛАВНЫЙ СЕКРЕТ: Если центр нового лица внутри 60% ширины/высоты старого, 
-        # это ТОТ ЖЕ человек, даже если он отошел и лицо стало в 2 раза меньше!
+        
         if dist_x < 0.6 and dist_y < 0.6:
             return True
             
@@ -267,12 +258,11 @@ class SmartFaceTracker:
                 result.append((face_id, x, y, w, h))
                 assigned_detections.add(best_det_idx)
             else:
-                # ✅ УВЕЛИЧЕНО ВРЕМЯ ЖИЗНИ ДО 3.0 СЕКУНД (90 кадров при 30fps)
                 # Если детектор моргнул или лицо временно скрылось, ID не слетит.
                 if current_frame - last_seen > 3.0:
                     del self.tracked_faces[face_id]
                     
-        # Создаем новые ID для действительно новых лиц
+        # Создаем новые ID для новых лиц
         for idx, (x, y, w, h) in enumerate(detected_faces):
             if idx not in assigned_detections:
                 face_id = self.next_id
@@ -300,7 +290,6 @@ class CameraWorker(QThread):
         self.running = False
         self.face_tracker = SmartFaceTracker()
         self.mp_face = mp.solutions.face_detection
-        # ✅ СНИЖЕН ДО 0.25 ДЛЯ ЛОВЛИ МЕЛКИХ ЛИЦ ВДАЛЕКЕ
         self.detector = self.mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.25)
         
         self.tracking_active = False
@@ -317,7 +306,7 @@ class CameraWorker(QThread):
         self.smooth_y = 0.0
         self.last_known_position = None
         self.lost_frames = 0
-        self.max_lost_frames = 90  # ✅ 3 секунды памяти перед сдачей
+        self.max_lost_frames = 90  # 3 секунды памяти перед сдачей
         self.search_mode = False
 
     def run(self):
@@ -399,7 +388,7 @@ class CameraWorker(QThread):
             if self.tracking_active and not target_found:
                 self.lost_frames += 1
                 if self.lost_frames >= self.max_lost_frames:
-                    self.status_signal.emit(f"❌ Цель потеряна! Выберите новую.")
+                    self.status_signal.emit(f"Цель потеряна! Выберите новую.")
                     self.tracking_active = False
                     self.target_face_id = -1
                     self.visca.move('stop')
